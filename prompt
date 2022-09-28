@@ -16,7 +16,15 @@ C_UNT="\[\e[38;2;100;100;100m\]"
 
 FMT_PWD="\[\e[38;2;${C_PWD}m\e[1m\]"
 
-P_USR="\[${T_BOLD}\e[38;2;${C_USR}m\]rammaz@hp\[${T_NORMAL}\]"
+if [ -z "$GITPS1_USR" ] ; then
+	GITPS1_USR="\u"
+fi
+
+if [ -z "$GITPS1_HOST" ] ; then
+	GITPS1_HOST="\h"
+fi
+
+P_USR="\[${T_BOLD}\e[38;2;${C_USR}m\]${GITPS1_USR}@${GITPS1_HOST}\[${T_NORMAL}\]"
 
 parse_changes() {
 	ST_NEW_COUNT=0

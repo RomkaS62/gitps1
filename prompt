@@ -1,0 +1,121 @@
+#!/bin/bash
+
+T_BOLD="\e[1m"
+T_NORMAL="\e[0m"
+
+C_PROMPT_BRANCH="170;120;120"
+FMT_BRANCH="\[\e[38;2;${C_PROMPT_BRANCH}m\]"
+
+C_USR="50;255;50"
+C_PWD="80;125;255"
+
+C_DEL="\[\e[38;2;255;0;0m\]"
+C_MOD="\[\e[38;2;255;255;0m\]"
+C_NEW="\[\e[38;2;0;255;0m\]"
+C_UNT="\[\e[38;2;100;100;100m\]"
+
+FMT_PWD="\[\e[38;2;${C_PWD}m\e[1m\]"
+
+P_USR="\[${T_BOLD}\e[38;2;${C_USR}m\]rammaz@hp\[${T_NORMAL}\]"
+
+parse_changes() {
+	ST_NEW_COUNT=0
+	ST_MOD_COUNT=0
+	ST_DEL_COUNT=0
+	UT_NEW_COUNT=0
+	UT_MOD_COUNT=0
+	UT_DEL_COUNT=0
+	UT_UNT_COUNT=0
+
+	while [ $# -gt 0 ] ; do
+		case $1 in
+			D_)		shift 1	;	ST_DEL_COUNT=$(($ST_DEL_COUNT + $1)) ;;
+			M_)		shift 1	;	ST_MOD_COUNT=$(($ST_MOD_COUNT + $1)) ;;
+			A_)		shift 1	;	ST_NEW_COUNT=$(($ST_NEW_COUNT + $1)) ;;
+			_D)		shift 1	;	UT_DEL_COUNT=$(($UT_DEL_COUNT + $1)) ;;
+			_M)		shift 1	;	UT_MOD_COUNT=$(($UT_MOD_COUNT + $1)) ;;
+			_A)		shift 1	;	UT_NEW_COUNT=$(($UT_NEW_COUNT + $1)) ;;
+
+			DD)
+				shift 1
+				ST_DEL_COUNT=$(($ST_DEL_COUNT + $1))
+				UT_DEL_COUNT=$(($UT_DEL_COUNT + $1))
+				;;
+
+			MM)
+				shift 1
+				ST_MOD_COUNT=$(($ST_MOD_COUNT + $1))
+				UT_MOD_COUNT=$(($UT_MOD_COUNT + $1))
+				;;
+
+			AA)
+				shift 1
+				ST_NEW_COUNT=$(($ST_NEW_COUNT + $1))
+				UT_NEW_COUNT=$(($UT_NEW_COUNT + $1))
+				;;
+
+			\?\?)
+				shift 1
+				UT_UNT_COUNT=$(($UT_UNT_COUNT + $1))
+				;;
+		esac
+
+		shift 1
+	done
+
+	ST_NEW="$C_NEW$ST_NEW_COUNT\[$T_NORMAL\]"
+	ST_MOD="$C_MOD$ST_MOD_COUNT\[$T_NORMAL\]"
+	ST_DEL="$C_DEL$ST_DEL_COUNT\[$T_NORMAL\]"
+	UT_NEW="$C_NEW$UT_NEW_COUNT\[$T_NORMAL\]"
+	UT_MOD="$C_MOD$UT_MOD_COUNT\[$T_NORMAL\]"
+	UT_DEL="$C_DEL$UT_DEL_COUNT\[$T_NORMAL\]"
+	UT_UNT="$C_UNT$UT_UNT_COUNT\[$T_NORMAL\]"
+}
+
+prompt_make() {
+	P_BRANCH=""
+	P_PWD='\w'
+
+	GIT_STATUS_OUTPUT=`git status --porcelain --ahead-behind -b 2> /dev/null`
+
+	if [ $? -eq 0 ] ; then
+		GIT_ROOT_DIR=$(git rev-parse --show-toplevel 2> /dev/null)
+		GIT_ROOT_BASENAME=$(basename "$GIT_ROOT_DIR")
+		P_PWD="git://${GIT_ROOT_BASENAME}${PWD#${GIT_ROOT_DIR}}"
+
+		BRANCH_INFO=$(grep '^#' <<<"$GIT_STATUS_OUTPUT")
+		BRANCH_NAME=$(sed 's/## \|\.\.\..*$//g' <<<"$BRANCH_INFO")
+
+		P_BRANCH_OFFSET=""
+
+		if grep <<<"$BRANCH_INFO" '\[\(ahead\|behind\) [0-9]\+\]' &> /dev/null ; then
+			BRANCH_OFFSET=$(sed <<<"$BRANCH_INFO"	\
+				's/.*\[\(\(ahead\|behind\) [0-9]\+\)\]/\1/'	\
+					| sed 's/ahead /+/' | sed 's/behind /-/')
+
+			BRANCH_OFFSET=" $BRANCH_OFFSET"
+
+			if [ "$BRANCH_OFFSET" -gt 0 ] ; then
+				FMT_BRANCH_OFFSET="\[${T_BOLD}\e[38;2;0;255;0m\]"
+			else
+				FMT_BRANCH_OFFSET="\[${T_BOLD}\e[38;2;255;0;0m\]"
+			fi
+
+			P_BRANCH_OFFSET="${FMT_BRANCH_OFFSET}${BRANCH_OFFSET}"
+		fi
+
+		CHANGES=$(tail +2 <<<"$GIT_STATUS_OUTPUT"	\
+			| sed 's/^ /_/' | sed 's/^\([A-Z]\) /\1_/'	\
+			| awk '{print $1}' | sort | uniq -c	\
+			| awk '{print $2 " " $1}')
+
+		parse_changes $CHANGES
+
+		P_CHANGES="${ST_NEW} ${ST_MOD} ${ST_DEL} | ${UT_NEW} ${UT_MOD} ${UT_DEL} | ${UT_UNT}"
+		P_BRANCH="\n$FMT_BRANCH[ ${BRANCH_NAME}${P_BRANCH_OFFSET}${FMT_BRANCH} : ${P_CHANGES}${FMT_BRANCH} ]${T_NORMAL}\n"
+	fi
+
+	PS1="${P_BRANCH}${P_USR}:${FMT_PWD}${P_PWD}\[${T_NORMAL}\]$ "
+}
+
+PROMPT_COMMAND="prompt_make"

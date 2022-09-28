@@ -28,36 +28,22 @@ parse_changes() {
 	UT_UNT_COUNT=0
 
 	while [ $# -gt 0 ] ; do
-		case $1 in
-			D_)		shift 1	;	ST_DEL_COUNT=$(($ST_DEL_COUNT + $1)) ;;
-			M_)		shift 1	;	ST_MOD_COUNT=$(($ST_MOD_COUNT + $1)) ;;
-			A_)		shift 1	;	ST_NEW_COUNT=$(($ST_NEW_COUNT + $1)) ;;
-			_D)		shift 1	;	UT_DEL_COUNT=$(($UT_DEL_COUNT + $1)) ;;
-			_M)		shift 1	;	UT_MOD_COUNT=$(($UT_MOD_COUNT + $1)) ;;
-			_A)		shift 1	;	UT_NEW_COUNT=$(($UT_NEW_COUNT + $1)) ;;
+		TYPE=$1
+		shift 1
+		COUNT=$1
 
-			DD)
-				shift 1
-				ST_DEL_COUNT=$(($ST_DEL_COUNT + $1))
-				UT_DEL_COUNT=$(($UT_DEL_COUNT + $1))
-				;;
+		case $TYPE in
+			D?)	ST_DEL_COUNT=$(($ST_DEL_COUNT + $COUNT)) ;;
+			M?)	ST_MOD_COUNT=$(($ST_MOD_COUNT + $COUNT)) ;;
+			A?)	ST_NEW_COUNT=$(($ST_NEW_COUNT + $COUNT)) ;;
 
-			MM)
-				shift 1
-				ST_MOD_COUNT=$(($ST_MOD_COUNT + $1))
-				UT_MOD_COUNT=$(($UT_MOD_COUNT + $1))
-				;;
+			\?\?) UT_UNT_COUNT=$(($UT_UNT_COUNT + $COUNT)) ;;
+		esac
 
-			AA)
-				shift 1
-				ST_NEW_COUNT=$(($ST_NEW_COUNT + $1))
-				UT_NEW_COUNT=$(($UT_NEW_COUNT + $1))
-				;;
-
-			\?\?)
-				shift 1
-				UT_UNT_COUNT=$(($UT_UNT_COUNT + $1))
-				;;
+		case $TYPE in
+			?D)	UT_DEL_COUNT=$(($UT_DEL_COUNT + $COUNT)) ;;
+			?M)	UT_MOD_COUNT=$(($UT_MOD_COUNT + $COUNT)) ;;
+			?A)	UT_NEW_COUNT=$(($UT_NEW_COUNT + $COUNT)) ;;
 		esac
 
 		shift 1
@@ -70,6 +56,16 @@ parse_changes() {
 	UT_MOD="$C_MOD$UT_MOD_COUNT\[$T_NORMAL\]"
 	UT_DEL="$C_DEL$UT_DEL_COUNT\[$T_NORMAL\]"
 	UT_UNT="$C_UNT$UT_UNT_COUNT\[$T_NORMAL\]"
+}
+
+echo_change_counts() {
+	echo $ST_NEW_COUNT
+	echo $ST_MOD_COUNT
+	echo $ST_DEL_COUNT
+	echo $UT_NEW_COUNT
+	echo $UT_MOD_COUNT
+	echo $UT_DEL_COUNT
+	echo $UT_UNT_COUNT
 }
 
 prompt_make() {

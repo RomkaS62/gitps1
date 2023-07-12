@@ -26,7 +26,7 @@ fi
 
 P_USR="\[${T_BOLD}\e[38;2;${C_USR}m\]${GITPS1_USR}@${GITPS1_HOST}\[${T_NORMAL}\]"
 
-parse_changes() {
+parse_output() {
 	ST_NEW_COUNT=0
 	ST_MOD_COUNT=0
 	ST_DEL_COUNT=0
@@ -36,72 +36,68 @@ parse_changes() {
 	UT_UNT_COUNT=0
 
 	while [ $# -gt 0 ] ; do
-		COUNT=$1
-		TYPE=$2
+		COUNT="$1"
+		shift 1
 
-		case $TYPE in
-			D?)	ST_DEL_COUNT=$(($ST_DEL_COUNT + $COUNT)) ;;
-			M?)	ST_MOD_COUNT=$(($ST_MOD_COUNT + $COUNT)) ;;
-			A?)	ST_NEW_COUNT=$(($ST_NEW_COUNT + $COUNT)) ;;
-
-			\?\?) UT_UNT_COUNT=$(($UT_UNT_COUNT + $COUNT)) ;;
+		case "$1" in
+			BRANCH=*) BRANCH_NAME="${1#BRANCH=}" ;;
+			OFFSET=*) BRANCH_OFFSET="${1#OFFSET=}" ;;
+			D?)	ST_DEL_COUNT="$((ST_DEL_COUNT + COUNT))" ;;
+			M?)	ST_MOD_COUNT="$((ST_MOD_COUNT + COUNT))" ;;
+			A?)	ST_NEW_COUNT="$((ST_NEW_COUNT + COUNT))" ;;
+			?D)	UT_DEL_COUNT="$((UT_DEL_COUNT + COUNT))" ;;
+			?M)	UT_MOD_COUNT="$((UT_MOD_COUNT + COUNT))" ;;
+			?A)	UT_NEW_COUNT="$((UT_NEW_COUNT + COUNT))" ;;
+			\?\?) UT_UNT_COUNT="$COUNT" ;;
 		esac
 
-		case $TYPE in
-			?D)	UT_DEL_COUNT=$(($UT_DEL_COUNT + $COUNT)) ;;
-			?M)	UT_MOD_COUNT=$(($UT_MOD_COUNT + $COUNT)) ;;
-			?A)	UT_NEW_COUNT=$(($UT_NEW_COUNT + $COUNT)) ;;
-		esac
-
-		shift 2
+		shift 1
 	done
 
-	ST_NEW="$C_NEW$ST_NEW_COUNT"
-	ST_MOD="$C_MOD$ST_MOD_COUNT"
-	ST_DEL="$C_DEL$ST_DEL_COUNT"
-	UT_NEW="$C_NEW$UT_NEW_COUNT"
-	UT_MOD="$C_MOD$UT_MOD_COUNT"
-	UT_DEL="$C_DEL$UT_DEL_COUNT"
-	UT_UNT="$C_UNT$UT_UNT_COUNT"
+	ST_DEL="${C_DEL}${ST_DEL_COUNT}"
+	ST_MOD="${C_MOD}${ST_MOD_COUNT}"
+	ST_NEW="${C_NEW}${ST_NEW_COUNT}"
+	UT_DEL="${C_DEL}${UT_DEL_COUNT}"
+	UT_MOD="${C_MOD}${UT_MOD_COUNT}"
+	UT_NEW="${C_NEW}${UT_NEW_COUNT}"
+	UT_UNT="${C_UNT}${UT_UNT_COUNT}"
 }
 
 prompt_make() {
 	P_BRANCH=""
 	P_PWD='\w'
 
-	GIT_STATUS_OUTPUT=`git status --porcelain --ahead-behind -b 2> /dev/null`
+	GIT_STATUS_OUTPUT="$(git status --porcelain --ahead-behind -b 2> /dev/null)"
 
 	if [ $? -eq 0 ] ; then
 		GIT_ROOT_DIR=$(git rev-parse --show-toplevel 2> /dev/null)
 		GIT_ROOT_BASENAME=$(basename "$GIT_ROOT_DIR")
 		P_PWD="git://${GIT_ROOT_BASENAME}${PWD#${GIT_ROOT_DIR}}"
 
-		BRANCH_NAME=$(sed -n 's/## \|\.\.\..*$//gp' <<<"$GIT_STATUS_OUTPUT")
+		set -f
 
-		BRANCH_OFFSET="$(sed -n <<<"$GIT_STATUS_OUTPUT"	\
-				-e 's/^#.*\[ahead \([0-9]\+\)\].*$/+\1/p'	\
-				-e 's/^#.*\[behind \([0-9]\+\)\].*$/-\1/p')"
-
-		if [ -z "$BRANCH_OFFSET" ] ; then
-			P_BRANCH_OFFSET="${C_UNT}${T_BOLD}0${T_NORMAL}"
-		else
-			if [ "$BRANCH_OFFSET" -gt 0 ] ; then
-				FMT_BRANCH_OFFSET="\[${T_BOLD}\e[38;2;0;255;0m\]"
-			else
-				FMT_BRANCH_OFFSET="\[${T_BOLD}\e[38;2;255;0;0m\]"
-			fi
-
-			P_BRANCH_OFFSET="${FMT_BRANCH_OFFSET}${BRANCH_OFFSET}"
-		fi
-
-		CHANGES=$(sed -n <<<"$GIT_STATUS_OUTPUT"	\
+		parse_output $(printf "%s" "$GIT_STATUS_OUTPUT"	\
+				| sed -n	\
+					-e 's/^## \([a-zA-Z_0-9-]*\)\.\.\..* \[ahead \([0-9]\+\)\]$/BRANCH=\1\nOFFSET=+\2/p'	\
+					-e 's/^## \([a-zA-Z_0-9-]*\)\.\.\..* \[behind \([0-9]\+\)\]$/BRANCH=\1\nOFFSET=-\2/p'	\
+					-e 's/^## \([a-zA-Z_0-9-]*\)\.\.\..*$/BRANCH=\1\nOFFSET=0/p'	\
 					-e 's/^ \([A-Z?]\) .*$/_\1/p'	\
 					-e 's/^\([A-Z?]\) .*$/\1_/p'	\
 					-e 's/^\([A-Z?][A-Z?]\) .*$/\1/p'	\
-			| sort	\
-			| uniq -c)
+				| sort	\
+				| uniq -c)
 
-		parse_changes $CHANGES
+		set +f
+
+		if [ "$BRANCH_OFFSET" -gt 0 ] ; then
+			FMT_BRANCH_OFFSET="\[${T_BOLD}\e[38;2;0;255;0m\]"
+		elif [ "$BRANCH_OFFSET" -lt 0 ] ; then
+			FMT_BRANCH_OFFSET="\[${T_BOLD}\e[38;2;255;0;0m\]"
+		else
+			FMT_BRANCH_OFFSET="\[${C_UNT}${T_BOLD}\]"
+		fi
+
+		P_BRANCH_OFFSET="${FMT_BRANCH_OFFSET}${BRANCH_OFFSET}${T_NORMAL}"
 
 		P_STAGED="${ST_NEW} ${ST_MOD} ${ST_DEL}${T_NORMAL}"
 		P_UNSTAGED="${UT_NEW} ${UT_MOD} ${UT_DEL}${T_NORMAL}"

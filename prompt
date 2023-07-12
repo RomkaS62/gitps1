@@ -36,9 +36,8 @@ parse_changes() {
 	UT_UNT_COUNT=0
 
 	while [ $# -gt 0 ] ; do
-		TYPE=$1
-		shift 1
 		COUNT=$1
+		TYPE=$2
 
 		case $TYPE in
 			D?)	ST_DEL_COUNT=$(($ST_DEL_COUNT + $COUNT)) ;;
@@ -54,26 +53,16 @@ parse_changes() {
 			?A)	UT_NEW_COUNT=$(($UT_NEW_COUNT + $COUNT)) ;;
 		esac
 
-		shift 1
+		shift 2
 	done
 
-	ST_NEW="$C_NEW$ST_NEW_COUNT\[$T_NORMAL\]"
-	ST_MOD="$C_MOD$ST_MOD_COUNT\[$T_NORMAL\]"
-	ST_DEL="$C_DEL$ST_DEL_COUNT\[$T_NORMAL\]"
-	UT_NEW="$C_NEW$UT_NEW_COUNT\[$T_NORMAL\]"
-	UT_MOD="$C_MOD$UT_MOD_COUNT\[$T_NORMAL\]"
-	UT_DEL="$C_DEL$UT_DEL_COUNT\[$T_NORMAL\]"
-	UT_UNT="$C_UNT$UT_UNT_COUNT\[$T_NORMAL\]"
-}
-
-echo_change_counts() {
-	echo $ST_NEW_COUNT
-	echo $ST_MOD_COUNT
-	echo $ST_DEL_COUNT
-	echo $UT_NEW_COUNT
-	echo $UT_MOD_COUNT
-	echo $UT_DEL_COUNT
-	echo $UT_UNT_COUNT
+	ST_NEW="$C_NEW$ST_NEW_COUNT"
+	ST_MOD="$C_MOD$ST_MOD_COUNT"
+	ST_DEL="$C_DEL$ST_DEL_COUNT"
+	UT_NEW="$C_NEW$UT_NEW_COUNT"
+	UT_MOD="$C_MOD$UT_MOD_COUNT"
+	UT_DEL="$C_DEL$UT_DEL_COUNT"
+	UT_UNT="$C_UNT$UT_UNT_COUNT"
 }
 
 prompt_make() {
@@ -108,14 +97,18 @@ prompt_make() {
 			P_BRANCH_OFFSET="${FMT_BRANCH_OFFSET}${BRANCH_OFFSET}"
 		fi
 
-		CHANGES=$(tail +2 <<<"$GIT_STATUS_OUTPUT"	\
-			| sed 's/^ /_/' | sed 's/^\([A-Z]\) /\1_/'	\
-			| awk '{print $1}' | sort | uniq -c	\
-			| awk '{print $2 " " $1}')
+		CHANGES=$(sed -n <<<"$GIT_STATUS_OUTPUT"	\
+					-e 's/^ \([A-Z?]\) .*$/_\1/p'	\
+					-e 's/^\([A-Z?]\) .*$/\1_/p'	\
+					-e 's/^\([A-Z?][A-Z?]\) .*$/\1/p'	\
+			| sort	\
+			| uniq -c)
 
 		parse_changes $CHANGES
 
-		P_CHANGES="${ST_NEW} ${ST_MOD} ${ST_DEL} | ${UT_NEW} ${UT_MOD} ${UT_DEL} | ${UT_UNT}"
+		P_STAGED="${ST_NEW} ${ST_MOD} ${ST_DEL}${T_NORMAL}"
+		P_UNSTAGED="${UT_NEW} ${UT_MOD} ${UT_DEL}${T_NORMAL}"
+		P_CHANGES="${P_STAGED} | ${P_UNSTAGED} | ${UT_UNT}"
 		P_BRANCH="$FMT_BRANCH[ ${BRANCH_NAME}${P_BRANCH_OFFSET}${FMT_BRANCH} : ${P_CHANGES}${FMT_BRANCH} ]${T_NORMAL}\n"
 	fi
 

@@ -76,18 +76,15 @@ prompt_make() {
 		GIT_ROOT_BASENAME=$(basename "$GIT_ROOT_DIR")
 		P_PWD="git://${GIT_ROOT_BASENAME}${PWD#${GIT_ROOT_DIR}}"
 
-		BRANCH_INFO=$(grep '^#' <<<"$GIT_STATUS_OUTPUT")
-		BRANCH_NAME=$(sed 's/## \|\.\.\..*$//g' <<<"$BRANCH_INFO")
+		BRANCH_NAME=$(sed -n 's/## \|\.\.\..*$//gp' <<<"$GIT_STATUS_OUTPUT")
 
-		P_BRANCH_OFFSET=""
+		BRANCH_OFFSET="$(sed -n <<<"$GIT_STATUS_OUTPUT"	\
+				-e 's/^#.*\[ahead \([0-9]\+\)\].*$/+\1/p'	\
+				-e 's/^#.*\[behind \([0-9]\+\)\].*$/-\1/p')"
 
-		if grep <<<"$BRANCH_INFO" '\[\(ahead\|behind\) [0-9]\+\]' &> /dev/null ; then
-			BRANCH_OFFSET=$(sed <<<"$BRANCH_INFO"	\
-				's/.*\[\(\(ahead\|behind\) [0-9]\+\)\]/\1/'	\
-					| sed 's/ahead /+/' | sed 's/behind /-/')
-
-			BRANCH_OFFSET=" $BRANCH_OFFSET"
-
+		if [ -z "$BRANCH_OFFSET" ] ; then
+			P_BRANCH_OFFSET="${C_UNT}${T_BOLD}0${T_NORMAL}"
+		else
 			if [ "$BRANCH_OFFSET" -gt 0 ] ; then
 				FMT_BRANCH_OFFSET="\[${T_BOLD}\e[38;2;0;255;0m\]"
 			else
@@ -109,7 +106,7 @@ prompt_make() {
 		P_STAGED="${ST_NEW} ${ST_MOD} ${ST_DEL}${T_NORMAL}"
 		P_UNSTAGED="${UT_NEW} ${UT_MOD} ${UT_DEL}${T_NORMAL}"
 		P_CHANGES="${P_STAGED} | ${P_UNSTAGED} | ${UT_UNT}"
-		P_BRANCH="$FMT_BRANCH[ ${BRANCH_NAME}${P_BRANCH_OFFSET}${FMT_BRANCH} : ${P_CHANGES}${FMT_BRANCH} ]${T_NORMAL}\n"
+		P_BRANCH="$FMT_BRANCH[ ${BRANCH_NAME} ${P_BRANCH_OFFSET}${FMT_BRANCH} : ${P_CHANGES}${FMT_BRANCH} ]${T_NORMAL}\n"
 	fi
 
 	TIMESTAMP="${C_MOD}[\D{%F %T}]${T_NORMAL}"
